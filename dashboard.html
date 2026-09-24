@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetailOS Command Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #1e1e2e; color: #cdd6f4; text-align: center; padding: 20px; }
+        .container { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .row { display: flex; gap: 15px; width: 90%; max-width: 700px; justify-content: center; }
+        .card { background-color: #313244; padding: 20px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); flex: 1; }
+        h1 { color: #89b4fa; margin-top: 0; font-size: 1.5rem; }
+        h2 { font-size: 1rem; color: #a6adc8; margin: 0 0 10px 0; }
+        .metric { font-size: 2.8rem; font-weight: bold; color: #a6e3a1; margin: 5px 0; }
+        .sub-metric { font-size: 1.8rem; font-weight: bold; color: #89b4fa; margin: 5px 0; }
+        .alert-metric { font-size: 1.8rem; font-weight: bold; color: #f38ba8; margin: 5px 0; }
+        .status { font-size: 1rem; font-weight: bold; }
+        .timestamp { font-size: 0.8rem; color: #a6adc8; }
+        .chart-container { background-color: #313244; padding: 15px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); width: 90%; max-width: 700px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="card">
+                <h2>Active Shoppers</h2>
+                <div class="metric" id="shopper-count">0</div>
+            </div>
+            <div class="card">
+                <h2>Shelf Stock Level</h2>
+                <div class="sub-metric" id="stock-level">--%</div>
+            </div>
+            <div class="card">
+                <h2>Restock Alerts</h2>
+                <div class="alert-metric" id="restock-alerts">0</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="card">
+                <h2>Edge Inference Speed</h2>
+                <div class="sub-metric" id="fps-count">0.0 FPS</div>
+            </div>
+            <div class="card">
+                <h1>RetailOS Command Center</h1>
+                <p class="status">Status: <span id="status-text" style="color: #f9e2af;">CONNECTING...</span></p>
+                <p class="timestamp">Last Updated: <span id="timestamp">--</span></p>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="trafficChart" height="90"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        const trafficChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Active Shoppers',
+                    data: [],
+                    borderColor: '#a6e3a1',
+                    backgroundColor: 'rgba(166, 227, 161, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#cdd6f4' }, grid: { color: '#45475a' } },
+                    x: { ticks: { color: '#cdd6f4' }, grid: { color: '#45475a' } }
+                },
+                plugins: { legend: { labels: { color: '#cdd6f4' } } }
+            }
+        });
+
+        async function fetchRetailData() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/shopper-status');
+                const data = await response.json();
+                
+                if(data.error) {
+                    document.getElementById('status-text').innerText = "WAITING FOR AI ENGINE";
+                } else {
+                    document.getElementById('status-text').innerText = data.edge_status;
+                    document.getElementById('status-text').style.color = "#a6e3a1";
+                    document.getElementById('shopper-count').innerText = data.active_shoppers;
+                    document.getElementById('fps-count').innerText = data.fps + " FPS";
+                    document.getElementById('stock-level').innerText = data.shelf_stock_level;
+                    document.getElementById('restock-alerts').innerText = data.restock_alerts;
+                    document.getElementById('timestamp').innerText = data.timestamp;
+                    
+                    const timeString = new Date().toLocaleTimeString();
+                    if (trafficChart.data.labels.length > 15) {
+                        trafficChart.data.labels.shift();
+                        trafficChart.data.datasets[0].data.shift();
+                    }
+                    trafficChart.data.labels.push(timeString);
+                    trafficChart.data.datasets[0].data.push(data.active_shoppers);
+                    trafficChart.update();
+                }
+            } catch (error) {
+                document.getElementById('status-text').innerText = "API DISCONNECTED";
+            }
+        }
+        
+        setInterval(fetchRetailData, 1000);
+        fetchRetailData();
+    </script>
+</body>
+</html>
